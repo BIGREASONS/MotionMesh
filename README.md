@@ -6,6 +6,13 @@ Regression pipeline for predicting continuous traffic demand at geohash location
 
 Predict traffic demand (0 to 1) for specific geohash locations at 15-minute intervals. Training data covers Day 48 and early Day 49 (~77k rows). Test data covers the remainder of Day 49 (~42k rows).
 
+## Competition Result (Flipkart Gridlock 2.0)
+
+Built a spatiotemporal traffic forecasting pipeline for the Flipkart Gridlock 2.0 Hackathon using a historical traffic feature store, an ensemble of CatBoost, LightGBM, and XGBoost, and geohash-aware validation.
+
+- **Public Leaderboard Score:** 92.98
+- **Validation R²:** ~0.91–0.94 across multiple out-of-time temporal holdouts.
+
 ## External Historical Data
 
 This pipeline uses a historical traffic dataset as a feature store for constructing aggregate statistical features. Only data from Days 1-47 is used to derive:
