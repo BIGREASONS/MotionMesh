@@ -57,8 +57,7 @@ All seeds flow from `SEED = 42`. Requires `train.csv`, `test.csv`, and `grab_tra
 
 ```
 ├── dataset/
-│   ├── solution.py        Main pipeline
-│   └── analyze_grab.py    Data overlap analysis
+│   └── solution.py        Main pipeline
 ├── approach.txt           Approach summary
 ├── methodology_report.md  Technical write-up
 ├── requirements.txt

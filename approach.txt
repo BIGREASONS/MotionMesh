@@ -109,5 +109,4 @@ Python 3.9+, pandas, numpy, scikit-learn, CatBoost, LightGBM, XGBoost
 9. Source Files
 ----------------
 solution.py       Complete training and prediction pipeline
-analyze_grab.py   Data overlap analysis utility
 approach.txt      This document
