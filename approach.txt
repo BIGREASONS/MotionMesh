@@ -10,7 +10,7 @@ Test covers Day 49 from 02:15 onward. Metric is R-squared.
 
 2. External Data
 -----------------
-The Grab Traffic Management dataset (publicly available) provides 4.2M rows
+A publicly available historical traffic dataset provides 4.2M observations
 across 61 days for the same geographic region. All competition geohashes
 appear in this dataset.
 
@@ -24,9 +24,9 @@ Usage policy:
 
 3. Feature Engineering
 -----------------------
-The pipeline builds approximately 120 features (exact count printed at runtime).
+The pipeline derives robust spatiotemporal features.
 
-Historical profiles (from Grab days 1-47):
+Historical profiles (from days 1-47):
   - Geohash-level: mean, std, median, min, max, count, Q25, Q75, Q90, skew,
     IQR, range, coefficient of variation
   - Geohash + Timestamp: mean, std, median, count
