@@ -11,6 +11,7 @@ Predict traffic demand (0 to 1) for specific geohash locations at 15-minute inte
 Built a spatiotemporal traffic forecasting pipeline for the Flipkart Gridlock 2.0 Hackathon using a historical traffic feature store, an ensemble of CatBoost, LightGBM, and XGBoost, and geohash-aware validation.
 
 - **Public Leaderboard Score:** 92.98
+  ![Public Leaderboard Score](leaderboard_score.png)
 - **Validation R²:** ~0.91–0.94 across multiple out-of-time temporal holdouts.
 
 ## External Historical Data
