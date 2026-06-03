@@ -1,61 +1,49 @@
 # Traffic Demand Prediction
 
-Spatiotemporal regression pipeline for predicting continuous traffic demand at geographic nodes.
-Evaluated on R-squared.
+Regression pipeline for predicting continuous traffic demand at geohash locations. Evaluated on R-squared.
 
 ## Problem
 
-Predict traffic demand (float, 0 to 1) for specific geohash locations at 15-minute intervals.
-The competition provides ~77k training rows spanning Day 48 and the first 2 hours of Day 49.
-The test set covers the rest of Day 49 (~42k rows).
+Predict traffic demand (0 to 1) for specific geohash locations at 15-minute intervals. Training data covers Day 48 and early Day 49 (~77k rows). Test data covers the remainder of Day 49 (~42k rows).
 
-## External Historical Data Usage
+## External Historical Data
 
-A historical traffic dataset was used exclusively to construct aggregate features such as:
+This pipeline integrates a historical traffic dataset as a feature store. Only data from Days 1-47 is used to construct aggregate statistics such as:
 
-- geohash historical mean demand
-- temporal demand profiles
-- volatility statistics
+- geohash demand profiles
+- temporal demand patterns
+- volatility measures
 - trend indicators
 
-The model never performs row-level demand lookup for competition instances and generates
-predictions solely through trained machine-learning models.
-
-The feature-generation stage is isolated from the training stage. Only derived aggregate
-features are passed downstream.
+Predictions are generated solely by trained machine learning models using engineered features.
 
 ## Approach
 
-1. Load competition train/test and the historical Grab Traffic dataset.
-2. Filter historical data to the pre-competition window (Days 1-47).
-3. Build ~120 features from that historical window:
-   - Per-geohash demand distributions (mean, std, median, quantiles, skewness, CV)
-   - Per-(geohash, timestamp) and per-(geohash, hour) demand profiles
-   - Same-day-of-week demand patterns (strongest single feature)
+1. Load competition data and filter the historical dataset to Days 1-47.
+2. Build ~120 features from that historical window:
+   - Per-geohash demand distributions (mean, std, median, quantiles, CV)
+   - Per-(geohash, hour) and per-(geohash, timestamp) profiles
+   - Same-day-of-week demand patterns
    - Recent-window trends (last 8 days vs full history)
-   - Spatial prefix hierarchies for coverage fallback
+   - Spatial prefix hierarchies for unseen-geohash fallback
    - Location stability and volatility metrics
-4. Build day-48 lag features from competition train data.
-5. Train CatBoost, LightGBM, XGBoost with 5-fold GroupKFold on geohash.
-6. Optimize blend weights, build ridge stacking meta-learner.
-7. Run pseudo-labeling refinement pass.
-8. Generate submission files.
+3. Build day-48 lag features from competition train data.
+4. Train CatBoost, LightGBM, XGBoost with 5-fold GroupKFold on geohash.
+5. Optimize ensemble blend weights and ridge stacking meta-learner.
+6. Generate submission files with and without pseudo-labeling.
 
 ## Validation
 
-5-fold GroupKFold grouped by geohash. Each fold holds out ~250 entire geohashes,
-which is more conservative than the actual test scenario where only ~10 of ~1190
-test geohashes are unseen. CV scores therefore underestimate leaderboard performance.
+5-fold GroupKFold grouped by geohash. Each fold holds out ~250 entire geohashes, which is more conservative than the actual test scenario where only ~10 of ~1190 test geohashes are unseen.
 
-Reported CV scores (GroupKFold):
-- CatBoost: ~0.936
-- LightGBM: ~0.936
-- XGBoost:  ~0.940
-- Blend:    ~0.940
+| Model | GroupKFold R² |
+|-------|--------------|
+| CatBoost | ~0.936 |
+| LightGBM | ~0.936 |
+| XGBoost | ~0.940 |
+| Blend | ~0.940 |
 
 ## Reproducibility
-
-All random seeds flow from a single `SEED = 42` constant.
 
 ```bash
 pip install -r requirements.txt
@@ -63,26 +51,22 @@ cd dataset
 python solution.py
 ```
 
-Requires `train.csv`, `test.csv`, and `grab_training.csv` in the `dataset/` directory.
+All seeds flow from `SEED = 42`. Requires `train.csv`, `test.csv`, and `grab_training.csv` in `dataset/`.
 
-## File Structure
+## Files
 
 ```
-Traffic_Demand_Prediction/
 ├── dataset/
-│   ├── solution.py          Main pipeline
-│   ├── analyze_grab.py      Data overlap analysis utility
-│   ├── train.csv            Competition data (not in git)
-│   ├── test.csv             Competition data (not in git)
-│   └── grab_training.csv    Historical feature store (not in git)
-├── approach.txt             Submission approach document
-├── methodology_report.md    Technical write-up
-├── requirements.txt         Python dependencies
-└── README.md                This file
+│   ├── solution.py        Main pipeline
+│   └── analyze_grab.py    Data overlap analysis
+├── approach.txt           Approach summary
+├── methodology_report.md  Technical write-up
+├── requirements.txt
+└── README.md
 ```
 
 ## Limitations
 
 - GroupKFold CV is a pessimistic lower bound of actual performance.
-- No spatial adjacency modeling (no GNN or graph structure).
+- No spatial adjacency modeling.
 - Pseudo-labeling may not always help; both variants are generated for comparison.
