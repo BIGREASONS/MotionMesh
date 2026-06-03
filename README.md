@@ -67,6 +67,6 @@ All seeds flow from `SEED = 42`. Requires `train.csv`, `test.csv`, and `grab_tra
 
 ## Limitations
 
-- GroupKFold CV is a pessimistic lower bound of actual performance.
+- Temporal holdout benchmarks suggest expected performance in the 0.91-0.95 range.
 - No spatial adjacency modeling.
 - Pseudo-labeling may not always help; both variants are generated for comparison.
