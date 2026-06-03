@@ -1,64 +1,95 @@
-# Traffic Demand Prediction (Hackathon Solution)
+# Traffic Demand Prediction
 
-This repository contains an advanced, high-performance machine learning pipeline built to predict traffic demand at specific geographic locations and times.
+Spatiotemporal regression pipeline for predicting continuous traffic demand at geographic nodes.  
+Evaluated on R-squared.
 
-## 🏆 Overview
+## What This Does
 
-The solution was designed for a tabular machine learning hackathon where the goal is to predict continuous traffic demand (0-1 range). The key breakthrough of this solution is leveraging 47 days of **historical Grab Traffic Management data** as an external feature store, rather than simply treating it as a label lookup. 
+Predicts traffic demand (float, 0 to 1) for specific geohash locations at 15-minute intervals. 
 
-By building robust historical profiles (mean, standard deviation, trends, day-of-week cycles) for every geographic location and time slot, this pipeline achieves exceptional out-of-fold validation scores.
+The competition provides ~77k training rows spanning Day 48 and the first 2 hours of Day 49. The test set covers the rest of Day 49 (~42k rows).
 
-### Key Features
-- **Extensive Feature Engineering**: Over 120 features including historical demand profiles, recent trends, location volatility, and interaction features.
-- **Leakage-Proof Validation**: Utilizes `GroupKFold` grouped by `geohash` to ensure the cross-validation score is honest and prevents spatial target leakage.
-- **Ensemble Modeling**: A weighted blend and ridge stacking of **XGBoost, LightGBM, and CatBoost**.
-- **Pseudo-labeling**: Reinforces model predictions by augmenting the training set with highly confident test set predictions.
+This pipeline integrates the public Grab Traffic Management dataset as a historical feature store.
+Days 1 through 47 are used to build statistical location profiles.
+The raw `grab` variable is deleted immediately after filtering to prevent accidental downstream usage.
 
-## 🛠️ Repository Structure
+No test labels are recovered. No row-level demand lookup is performed.
+All external features are aggregate statistics from the historical window.
 
-- `dataset/solution.py` - The core training and prediction pipeline. Contains the feature engineering logic, GroupKFold validation, model training, ensembling, and pseudo-labeling.
-- `dataset/analyze_grab.py` - A utility script to analyze the overlap between the competition data and the external historical Grab dataset.
-- `dataset/approach.txt` - A detailed write-up of the strategy, feature impact rankings, and rationale behind the solution architecture.
+## How It Works
 
-## 🚀 Getting Started
+1. Load competition train/test and the Grab historical dataset.
+2. Filter Grab to days 1-47 only, then `del grab_raw` (line 21 of solution.py).
+3. Build ~120 features from that historical window:
+   - Per-geohash demand profiles (mean, std, median, quantiles, skewness, CV)
+   - Per-(geohash, timestamp) and per-(geohash, hour) historical averages
+   - Same-day-of-week historical demand (the strongest single feature)
+   - Recent-window trends (last 8 days vs full history)
+   - Spatial prefix hierarchies (prefix-4, prefix-5 fallbacks)
+   - Location stability and volatility metrics
+4. Build day-48 lag features from competition train data.
+5. Train CatBoost, LightGBM, XGBoost with 5-fold GroupKFold on geohash.
+6. Optimize blend weights, build ridge stacking meta-learner.
+7. Run pseudo-labeling refinement pass.
+8. Generate multiple submission files.
 
-### Prerequisites
+## Validation
 
-You will need the following libraries installed:
+5-fold GroupKFold grouped by `geohash`.
+
+This is intentionally pessimistic: each fold holds out ~250 entire geohashes,
+simulating prediction on completely unseen locations. Since only ~10 of ~1190
+test geohashes are actually unseen, real LB performance is expected to be higher.
+
+Reported CV scores (GroupKFold):
+- CatBoost: ~0.936
+- LightGBM: ~0.936
+- XGBoost:  ~0.940
+- Blend:    ~0.940
+
+Actual feature count is printed at runtime by solution.py.
+
+## Reproducibility
+
+All random seeds flow from a single `SEED = 42` constant at the top of solution.py.
+
 ```bash
 pip install -r requirements.txt
-```
-
-### Data Requirements
-To run this pipeline, you need the following CSV files placed in the `dataset/` folder:
-- `train.csv` (Competition training data)
-- `test.csv` (Competition test data)
-- `grab_training.csv` (The external historical Grab dataset)
-
-> **Note**: Due to file size limits, the CSV data files are intentionally excluded from this repository via `.gitignore`.
-
-### Running the Pipeline
-
-Simply execute the main solution script:
-
-```bash
 cd dataset
 python solution.py
 ```
 
-This will automatically:
-1. Build the historical feature store from the Grab dataset.
-2. Train CatBoost, LightGBM, and XGBoost models.
-3. Optimize the ensemble weights.
-4. Run the pseudo-labeling loop.
-5. Output multiple submission files including `submission_final.csv` (the recommended blend).
+Requires `train.csv`, `test.csv`, and `grab_training.csv` in the `dataset/` directory.
 
-## 📊 Results
+## File Structure
 
-The model achieves the following GroupKFold (Geohash Holdout) CV scores:
-- **CatBoost**: 0.9359
-- **LightGBM**: 0.9362
-- **XGBoost**: 0.9397
-- **Ensemble Blend**: **0.9400**
+```
+Traffic_Demand_Prediction/
+├── dataset/
+│   ├── solution.py          Main pipeline
+│   ├── analyze_grab.py      Data overlap analysis utility
+│   ├── train.csv            Competition data (not in git)
+│   ├── test.csv             Competition data (not in git)
+│   └── grab_training.csv    Historical feature store (not in git)
+├── approach.txt             Submission approach document
+├── methodology_report.md    Technical write-up
+├── requirements.txt         Python dependencies
+└── README.md                This file
+```
 
-*Note: Because this GroupKFold strategy is extremely pessimistic, the expected actual Leaderboard score is in the 0.96-0.98+ range.*
+## Leakage Verification
+
+Run this to confirm no use of raw Grab data after the filter:
+
+```bash
+findstr /n "grab_raw" dataset\solution.py
+```
+
+Expected output: only lines 12, 15, 17, 20 (load, rename, filter, delete).
+After line 20, the variable no longer exists in memory.
+
+## Limitations
+
+- GroupKFold CV is a pessimistic lower bound.
+- The pipeline does not model spatial adjacency (no GNN/graph structure).
+- Pseudo-labeling may not always help; submit both with and without.

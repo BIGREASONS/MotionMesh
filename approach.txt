@@ -1,0 +1,113 @@
+Approach: Traffic Demand Prediction
+=====================================
+
+1. Problem
+----------
+Predict continuous traffic demand (0 to 1) at geohash locations across
+15-minute intervals. Train data covers Day 48 (full) and Day 49 (00:00-02:00).
+Test covers Day 49 from 02:15 onward. Metric is R-squared.
+
+
+2. External Data
+-----------------
+The Grab Traffic Management dataset (publicly available) provides 4.2M rows
+across 61 days for the same geographic region. All competition geohashes
+appear in this dataset.
+
+Usage policy:
+  - Only Days 1 through 47 are loaded as historical data.
+  - The raw variable is deleted after filtering (del grab_raw, line 21).
+  - No demand values from Day 48 onward are extracted from the external data.
+  - All derived features are aggregate statistics (mean, std, median, etc).
+  - No row-level target lookup is performed.
+
+
+3. Feature Engineering
+-----------------------
+The pipeline builds approximately 120 features (exact count printed at runtime).
+
+Historical profiles (from Grab days 1-47):
+  - Geohash-level: mean, std, median, min, max, count, Q25, Q75, Q90, skew,
+    IQR, range, coefficient of variation
+  - Geohash + Timestamp: mean, std, median, count
+  - Geohash + Hour: mean, std, median, min, max
+  - Geohash + Time Slot: mean, std
+  - Global hour and slot baselines
+  - Prefix-level (prefix-4, prefix-5): mean, std, count
+  - Prefix + Hour combinations
+
+Temporal trends:
+  - Recent window (last 8 days before Day 48) vs full 47-day history
+  - Difference and ratio features between recent and long-term averages
+
+Day-of-week features:
+  - Per-DOW demand profiles per geohash and per (geohash, hour)
+  - Same-DOW-as-competition feature (strongest single predictor)
+
+Stability metrics:
+  - Daily demand standard deviation per geohash
+  - Daily coefficient of variation
+  - Hourly volatility per (geohash, hour)
+
+Day-48 lag features (from competition train only):
+  - Exact (geohash, timestamp) match from Day 48
+  - Hierarchical fallback: geo+ts -> geo+hour -> geo -> prefix5+hour -> hour
+  - Set to NaN for Day-48 training rows to prevent circular leakage
+
+Target encoding:
+  - Out-of-fold encoding via GroupKFold on geohash
+  - Applied to: geohash, prefix4, prefix5, hour, time_slot,
+    RoadType, Weather, NumberofLanes, period
+
+Interaction features:
+  - Temperature * NumberofLanes, Temperature * Landmarks
+  - NumberofLanes * LargeVehicles, Temperature squared
+  - RoadType * Weather, RoadType * Lanes composites
+
+
+4. Validation
+--------------
+5-fold GroupKFold grouped by geohash.
+
+This ensures no geohash appears in both train and validation within any fold.
+It is deliberately pessimistic: each fold holds out ~250 geohashes entirely,
+but only ~10 of 1190 test geohashes are truly unseen. CV scores therefore
+underestimate actual leaderboard performance.
+
+
+5. Models
+----------
+CatBoost:  6000 iterations, lr=0.025, depth=8, early stopping 400
+LightGBM:  6000 iterations, lr=0.025, 127 leaves, early stopping 400
+XGBoost:   6000 iterations, lr=0.025, depth=8, early stopping 400
+
+All share a single SEED=42 constant for reproducibility.
+
+
+6. Ensemble
+------------
+- Grid-searched weighted blend of the three models (step=0.05)
+- Ridge regression stacking meta-learner
+- Pseudo-labeling: best predictions used as soft targets for augmented retraining
+
+
+7. Reported CV Scores (GroupKFold)
+-----------------------------------
+CatBoost:  ~0.936
+LightGBM:  ~0.936
+XGBoost:   ~0.940
+Blend:     ~0.940
+
+Actual feature count: printed dynamically by solution.py at runtime.
+
+
+8. Tools
+---------
+Python 3.9+, pandas, numpy, scikit-learn, CatBoost, LightGBM, XGBoost
+
+
+9. Source Files
+----------------
+solution.py       Complete training and prediction pipeline
+analyze_grab.py   Data overlap analysis utility
+approach.txt      This document

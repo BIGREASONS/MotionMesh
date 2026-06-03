@@ -6,15 +6,19 @@ from sklearn.linear_model import Ridge
 import warnings
 warnings.filterwarnings('ignore')
 
-grab = pd.read_csv(r'C:\Users\singh\Downloads\training.csv\training.csv')
+SEED = 42
+np.random.seed(SEED)
+
+grab_raw = pd.read_csv('grab_training.csv')
 train = pd.read_csv('train.csv')
 test = pd.read_csv('test.csv')
 target = 'demand'
 test_idx = test['Index'].values
 
-grab.rename(columns={'geohash6': 'geohash'}, inplace=True)
+grab_raw.rename(columns={'geohash6': 'geohash'}, inplace=True)
 
-hist = grab[grab['day'] <= 47].copy()
+hist = grab_raw[grab_raw['day'] <= 47].copy()
+del grab_raw
 print(f"Historical data: {len(hist)} rows, days 1-47")
 print(f"Unique geohashes in hist: {hist['geohash'].nunique()}")
 
@@ -320,7 +324,7 @@ cb_params = {
     'bagging_temperature': 0.3,
     'border_count': 254,
     'grow_policy': 'SymmetricTree',
-    'random_seed': 42,
+    'random_seed': SEED,
     'verbose': 200,
     'task_type': 'CPU',
     'eval_metric': 'R2',
@@ -364,7 +368,7 @@ lgb_params = {
     'colsample_bytree': 0.8,
     'reg_alpha': 0.1,
     'reg_lambda': 1.0,
-    'random_state': 42,
+    'random_state': SEED,
     'verbose': -1,
     'n_jobs': -1,
 }
@@ -397,7 +401,7 @@ xgb_params = {
     'colsample_bytree': 0.8,
     'reg_alpha': 0.1,
     'reg_lambda': 1.0,
-    'random_state': 42,
+    'random_state': SEED,
     'tree_method': 'hist',
     'verbosity': 0,
     'n_jobs': -1,
@@ -487,11 +491,11 @@ pl_lgb = np.zeros(len(X_test))
 gkf_pl = GroupKFold(n_splits=5)
 
 for fold, (tr_idx, val_idx) in enumerate(gkf_pl.split(X_aug, groups=groups_aug)):
-    m1 = CatBoostRegressor(**{**cb_params, 'random_seed': 999, 'verbose': 0})
+    m1 = CatBoostRegressor(**{**cb_params, 'random_seed': SEED + 1, 'verbose': 0})
     m1.fit(X_aug[tr_idx], y_aug[tr_idx])
     pl_cb += m1.predict(X_test) / 5
 
-    m2 = lgb.LGBMRegressor(**{**lgb_params, 'random_state': 999})
+    m2 = lgb.LGBMRegressor(**{**lgb_params, 'random_state': SEED + 1})
     m2.fit(X_aug[tr_idx], y_aug[tr_idx])
     pl_lgb += m2.predict(X_test) / 5
     print(f"PL Fold {fold} done")
